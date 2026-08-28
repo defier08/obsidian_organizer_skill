@@ -1,3 +1,7 @@
 {
-  "vault_root": "/path/to/your/obsidian/vault"
+  "vault_root": "/path/to/your/obsidian/vault",
+  "l1_root": "",
+  "l3_root": "",
+  "attachment_dir": "",
+  "template_dir": ""
 }
