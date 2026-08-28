@@ -26,8 +26,8 @@ L1 原始知识点 → L2 疑问追问 → L3 项目应用组合
 
 - **Vault 根路径**: 读取本目录下 `config.json` 的 `vault_root` 字段。首次使用请复制 `config.example.json` 为 `config.json` 并填入自己的 Vault 路径。
 - **可选覆盖**（`config.json` 中，留空则自动探测/使用默认值）：
-  - `l1_root`: L1 知识根目录名（默认 `20-领域/`）
-  - `l3_root`: L3 项目根目录名（默认 `10-项目/`）
+  - `l1_root`: L1 知识根目录名（默认 `10-领域/`）
+  - `l3_root`: L3 项目根目录名（默认 `20-项目/`）
   - `attachment_dir`: 附件目录名（默认 `30-资源/媒体附件/`）
   - `template_dir`: 模板目录名（默认 `99-模板/`）
 
