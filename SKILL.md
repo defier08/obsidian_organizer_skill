@@ -7,6 +7,22 @@ description: Obsidian Vault 文件管理工作流 — 三层知识模型（L1知
 
 按三层知识模型管理 Obsidian Vault 中的所有文件。**不依赖任何预置分类表**：每次运行自动扫描 Vault 的实际目录结构，按目录名提取关键词建立归类索引，随内容与结构变化增量适配。
 
+## 首次使用配置
+
+本 Skill 需要配置后才能使用。首次使用时我会主动引导你完成配置。
+
+配置项说明：
+- `vault_root`（必填）：Obsidian Vault 根目录绝对路径
+  示例：C:\Users\你的名字\Documents\MyVault
+- `l1_root`（可选）：L1知识点目录，留空则自动扫描 Vault 结构探测
+- `l3_root`（可选）：L3项目目录，留空则自动扫描探测
+- `attachment_dir`（可选）：附件目录，留空则自动探测
+- `template_dir`（可选）：模板目录，留空则自动探测
+
+配置文件位置：`config.json`（与 SKILL.md 同目录）
+修改配置：随时告诉我"重新配置 obsidian-vault-organizer"即可重新引导。
+手动配置：复制 `config.example.json` 为 `config.json`，填入个人路径。
+
 ## 三层模型
 
 ```
