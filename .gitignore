@@ -10,3 +10,6 @@ config.json
 # 临时报告文件
 share_check_report.md
 *.tmp
+
+# 本地备份（分享前保留安全网，但不提交）
+SKILL.md.bak*

@@ -3,5 +3,12 @@
   "l1_root": "",
   "l3_root": "",
   "attachment_dir": "",
-  "template_dir": ""
+  "template_dir": "",
+  "_comment": {
+    "vault_root": "必填。你的 Obsidian Vault 绝对路径，示例：C:\\Users\\你的名字\\Documents\\MyVault",
+    "l1_root": "可选。L1 知识根目录名，留空自动探测（默认 10-领域/）",
+    "l3_root": "可选。L3 项目根目录名，留空自动探测（默认 20-项目/）",
+    "attachment_dir": "可选。附件目录名，留空自动探测（默认 30-资源/媒体附件/）",
+    "template_dir": "可选。模板目录名，留空自动探测（默认 99-模板/）"
+  }
 }
