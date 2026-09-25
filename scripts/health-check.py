@@ -19,6 +19,9 @@ import difflib
 
 SKIP_DIRS = {'.git', '.obsidian', '.trash', '.agents', '.claude', '.opencode',
              'copilot', '.codebuddy', '.preview', 'node_modules'}
+# 本 skill 自身的产物文件：不参与三层模型，体检/断链扫描一律豁免（SKILL.md「三层模型」）
+SKIP_FILES = {'待记录缓冲区.md', '_taxonomy.generated.md'}
+PLACEHOLDERS = {'文件名', '概念', '链接', '别名', '标题', '笔记名', '相关笔记1', '相关笔记2'}
 
 
 def log(*a):
@@ -50,7 +53,7 @@ def walk_md(root, sub=None):
     for r, dirs, files in os.walk(base):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for f in files:
-            if f.endswith('.md'):
+            if f.endswith('.md') and f not in SKIP_FILES:
                 yield os.path.join(r, f)
 
 
@@ -142,21 +145,43 @@ def scan_root_scatter(root):
 
 
 def scan_links(root, sub=None):
-    """断链：指向不存在 .md 的 [[链接]]（跳过 ![[ 嵌入、非 md 目标、模板占位符形态）"""
-    all_names = set()
+    """断链：指向不存在 .md 的 [[链接]]（跳过 ![[ 嵌入、非 md 目标、模板占位符形态）。
+    与 verify_links.py 对齐：带路径链接校验路径真伪；无路径链接按 basename + 同名歧义处理。"""
+    idx = {}
     for p in walk_md(root):
-        all_names.add(os.path.basename(p)[:-3])
+        base = os.path.basename(p)[:-3]
+        rel = os.path.relpath(p, root).replace('\\', '/')
+        idx.setdefault(base, []).append(rel)
     bad = []
     for p in walk_md(root, sub):
         c = read(p)
         for m in re.finditer(r'(?<!\!)\[\[([^\]]+)\]\]', c):
             link = m.group(1).strip()
-            target = link.split('#')[0].split('|')[0].split('/')[-1].replace('.md', '').strip()
+            target = link.split('#')[0].split('|')[0].strip()
             if not target:
                 continue
-            if not re.search(r'\.(png|jpg|jpeg|gif|svg|pdf|webp|mp3|mp4)$', target, re.I) \
-               and target not in all_names:
-                bad.append((os.path.relpath(p, root), m.group(1)))
+            if re.search(r'\.(png|jpg|jpeg|gif|svg|pdf|webp|mp3|mp4|html)$', target, re.I):
+                continue
+            if '/' in target:
+                # 带路径：Obsidian 解析——basename 唯一时任何路径写法都有效；
+                # 多个同名文件时路径参与区分（真实相对路径去 .md 后以链接 target 结尾）
+                t_no_md = target[:-4] if target.endswith('.md') else target
+                if t_no_md.endswith('/'):
+                    # Obsidian 文件夹链接 [[目录/]]：目录真实存在即有效
+                    if os.path.isdir(os.path.join(root, t_no_md.replace('/', os.sep))):
+                        continue
+                    bad.append((os.path.relpath(p, root), m.group(1)))
+                    continue
+                name = t_no_md.rsplit('/', 1)[-1]
+                same = idx.get(name, [])
+                if not same:
+                    bad.append((os.path.relpath(p, root), m.group(1)))
+                elif len(same) > 1 and not any(r[:-3].endswith(t_no_md) for r in same):
+                    bad.append((os.path.relpath(p, root), m.group(1)))
+            else:
+                name = target.replace('.md', '')
+                if name not in idx and name not in PLACEHOLDERS:
+                    bad.append((os.path.relpath(p, root), m.group(1)))
     return bad
 
 

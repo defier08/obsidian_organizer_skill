@@ -64,7 +64,8 @@ obsidian-vault-organizer/
 │   └── project-scaffold.md     # L3 项目骨架示例
 ├── scripts/
 │   ├── health-check.py         # 健康体检：空壳/重复/命名/根目录散落/断链
-│   └── verify_links.py         # 链接验证：改名/移动后残留断链 = 0
+│   ├── verify_links.py         # 链接验证：改名/移动后残留断链 = 0（带路径真伪校验）
+│   └── rename_with_links.py    # 工作流 F：改名 + 链接重写一体（含 --dry-run，规则固化）
 ├── config.example.json         # 配置模板（分享用）
 ├── config.json                 # 你的本地配置（已 gitignore）
 └── .gitignore
