@@ -19,7 +19,7 @@ L1 原始知识点 → L2 疑问追问 → L3 项目应用组合
 
 1. 自动扫描 `vault_root` 的实际目录结构，以目录名为关键词建立归类索引
 2. 新笔记按关键词匹配到现有目录
-3. 无匹配时自动建议新建目录，并回写索引——**taxonomy 随你的记录增量生成**，Vault 结构变了它自动跟随
+3. 无匹配时自动建议新建目录——**归类索引按 Vault 实际结构现场生成（运行态）**，结构变了自动跟随；需要审计/人工微调时可落盘到 `_taxonomy.generated.md`（可选快照，由 AI 维护，非脚本自动生成）
 
 ## 安装
 
@@ -61,6 +61,9 @@ obsidian-vault-organizer/
 ├── SKILL.md                    # 工作流定义（通用方法论）
 ├── references/
 │   └── project-scaffold.md     # L3 项目骨架示例
+├── scripts/
+│   ├── health-check.py         # 健康体检：空壳/重复/命名/根目录散落/断链
+│   └── verify_links.py         # 链接验证：改名/移动后残留断链 = 0
 ├── config.example.json         # 配置模板（分享用）
 ├── config.json                 # 你的本地配置（已 gitignore）
 └── .gitignore
