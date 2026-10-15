@@ -15,50 +15,20 @@ Obsidian Vault 断链验证：列出所有指向不存在 .md 的 [[链接]]。
   - 跳过指向 .png/.jpg/.pdf 等非 md 目标的链接
   - 模板占位符形态（[[文件名]]/[[概念]]/[[链接]]）统计为"疑似占位"
 
-退出码：0 = 无真断链；1 = 存在真断链（供脚本联动判断）。
+退出码（与 scripts/vault_common.py 的约定一致）：
+  0 = 无真断链；1 = 存在真断链或读取失败的文件；2 = 参数或配置错误。
 """
-import io
-import json
 import os
 import re
 import sys
 
-SKIP_DIRS = {'.git', '.obsidian', '.trash', '.agents', '.claude', '.opencode',
-             'copilot', '.codebuddy', '.preview', 'node_modules'}
-SKIP_FILES = {'待记录缓冲区.md', '_taxonomy.generated.md'}
-PLACEHOLDERS = {'文件名', '概念', '链接', '别名', '标题', '笔记名', '相关笔记1', '相关笔记2'}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import vault_common as vc  # noqa: E402  （与本脚本同目录，共用配置与读取语义）
 
-
-def log(*a):
-    sys.stdout.write(' '.join(str(x) for x in a) + '\n')
-
-
-def read(p):
-    try:
-        return io.open(p, encoding='utf-8').read()
-    except Exception:
-        return ''
-
-
-def vault_root():
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cfg = os.path.join(here, 'config.json')
-    if os.path.exists(cfg):
-        try:
-            c = json.load(io.open(cfg, encoding='utf-8'))
-            if c.get('vault_root'):
-                return c['vault_root']
-        except Exception:
-            pass
-    return None
-
-
-def walk_md(root):
-    for r, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
-        for f in files:
-            if f.endswith('.md') and f not in SKIP_FILES:
-                yield os.path.join(r, f)
+log = vc.log
+walk_md = vc.walk_md
+PLACEHOLDERS = vc.PLACEHOLDERS
+norm_rel = vc.norm_rel
 
 
 def build_index(root):
@@ -66,8 +36,7 @@ def build_index(root):
     idx = {}
     for p in walk_md(root):
         base = os.path.basename(p)[:-3]
-        rel = os.path.relpath(p, root).replace('\\', '/')
-        idx.setdefault(base, []).append(rel)
+        idx.setdefault(base, []).append(norm_rel(p, root))
     return idx
 
 
@@ -92,10 +61,10 @@ def main():
         else:
             i += 1
     if not root:
-        root = vault_root()
+        root = vc.resolve_vault_root()
     if not root or not os.path.isdir(root):
         log('未找到 Vault 根（检查 config.json 的 vault_root 或传 --vault）。')
-        sys.exit(2)
+        sys.exit(vc.EXIT_USAGE)
 
     idx = build_index(root)
 
@@ -104,7 +73,7 @@ def main():
         miss = []
         ambig = []
         for t in sorted(targets):
-            t = t.replace('.md', '')
+            t = vc.strip_md(t)
             same = idx.get(t, [])
             if not same:
                 miss.append(t)
@@ -115,14 +84,19 @@ def main():
         for t, same in ambig:
             log(f'  ⚠️ 同名歧义: {t} -> {len(same)} 个文件，请用带路径形式区分')
         log('  缺失', len(miss), '个 / 歧义', len(ambig), '个 / 共', len(targets), '个')
-        sys.exit(1 if miss else 0)
+        sys.exit(vc.EXIT_FINDINGS if miss else vc.EXIT_OK)
 
     log(f'===== 断链验证: {root} =====')
     bad = []
     placeholder = []
     ambiguous = []
+    unreadable = []
     for p in walk_md(root):
-        c = read(p)
+        c, err = vc.read_text(p)
+        if err:
+            if err != 'missing':
+                unreadable.append((norm_rel(p, root), err))
+            continue
         for m in re.finditer(r'(?<!\!)\[\[([^\]]+)\]\]', c):
             link = m.group(1).strip()
             target, has_path = resolve_target(link)
@@ -152,7 +126,7 @@ def main():
                 bad.append((os.path.relpath(p, root), link))
             else:
                 # 无路径：basename 查找
-                name = target.replace('.md', '')
+                name = vc.strip_md(target)
                 same = idx.get(name, [])
                 if not same:
                     if name in PLACEHOLDERS or re.fullmatch(r'[A-Za-z]', name):
@@ -173,8 +147,13 @@ def main():
     log(f'\n疑似占位符（模板/学习路径未建卡片，通常无害）{len(placeholder)} 个:')
     for rel, link in placeholder[:10]:
         log(f'  {rel} -> {link}')
+    if unreadable:
+        log(f'\n读取失败的文件（未参与断链判断，请检查权限/编码）{len(unreadable)} 个:')
+        for rel, why in unreadable[:20]:
+            log(f'  {rel} — {why}')
     log('\n===== 验证完成 =====')
-    sys.exit(1 if bad else 0)
+    log(f'结论：真断链 {len(bad)} 个 / 读取失败 {len(unreadable)} 个')
+    sys.exit(vc.EXIT_FINDINGS if (bad or unreadable) else vc.EXIT_OK)
 
 
 if __name__ == '__main__':

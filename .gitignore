@@ -13,3 +13,7 @@ share_check_report.md
 
 # 本地备份（分享前保留安全网，但不提交）
 SKILL.md.bak*
+
+# Python 缓存
+__pycache__/
+*.pyc

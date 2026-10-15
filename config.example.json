@@ -1,14 +1,21 @@
 {
   "vault_root": "/path/to/your/obsidian/vault",
+  "resource_root": "",
+  "buffer_window": 10,
+  "l0_root": "",
   "l1_root": "",
   "l3_root": "",
   "attachment_dir": "",
   "template_dir": "",
   "_comment": {
-    "vault_root": "必填。你的 Obsidian Vault 绝对路径，示例：C:\\Users\\你的名字\\Documents\\MyVault",
-    "l1_root": "可选。L1 知识根目录名。留空时由 AI 按 SKILL.md 规则现场探测（探测为 AI 行为、非脚本），兜底默认 10-领域/",
-    "l3_root": "可选。L3 项目根目录名。留空时由 AI 现场探测（AI 行为、非脚本），兜底默认 20-项目/",
+    "vault_root": "必填。你的 Obsidian Vault 绝对路径（脚本唯一必读的路径字段）。示例：C:\\Users\\你的名字\\Documents\\MyVault",
+    "resource_root": "可选。资源根目录名（相对 vault_root），缓冲区与快照放在其下。脚本会读取此项，留空用默认 30-资源/",
+    "buffer_window": "可选。待记录缓冲区滑动窗口大小（默认 10）：缓冲区只保留最近 N 个对话的快照，登记后滚动清理超出项；可用 --window 临时覆盖",
+    "l0_root": "可选。L0 原始记录根目录名。留空时由 AI 现场探测（AI 行为、非脚本），兜底默认 00-原始记录/",
+    "l1_root": "可选。L1 知识根目录名。留空时由 AI 现场探测，兜底默认 10-领域/",
+    "l3_root": "可选。L3 项目根目录名。留空时由 AI 现场探测，兜底默认 20-项目/",
     "attachment_dir": "可选。附件目录名。留空时由 AI 现场探测，兜底默认 30-资源/媒体附件/",
-    "template_dir": "可选。模板目录名。留空时由 AI 现场探测，兜底默认 99-模板/"
+    "template_dir": "可选。模板目录名。留空时由 AI 现场探测，兜底默认 99-模板/",
+    "字段分工": "只有 vault_root 与 resource_root 会被 scripts/ 读取；其余字段是给 AI 做归类与探测的软提示，一律填目录名（相对 vault_root），不要填绝对路径"
   }
 }
