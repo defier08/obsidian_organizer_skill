@@ -11,15 +11,17 @@ obsidian-vault-organizer / scripts/pending_buffer.py
                          : 登记新项（推荐写法：标题可含任意字符，不会被拆分错位）
   - --add "标题|摘要|目标笔记" [--snapshot PATH]
                          : 登记新项（兼容旧写法；分段超过 3 段时报错，请改用 --title）
-  - --done N             : 将编号 N 标记为已记录
-  - --clear N1,N2,...    : 清除指定编号条目（整行移除，多选）
+  - --resolve "1,3"      : 只读，把默认列表显示序号解析为全局编号（1=131,3=133）
+  - --done N             : 将编号 N 标记为已记录（N 为全局编号，先用 --resolve 换算）
+  - --clear N1,N2,...    : 清除指定编号条目（整行移除，多选；N 为全局编号）
   - --vault <路径>       : 手动指定 Vault 根（默认读同目录 config.json 的 vault_root）
 
 约定：
   - 缓冲区文件 = {vault_root}/{resource_root}/待记录缓冲区.md，是唯一权威来源
     （resource_root 默认 30-资源，可在 config.json 覆盖）
   - 快照目录 = {vault_root}/{resource_root}/待记录快照/（L0 全量记录的唯一权威来源）
-  - 编号跨会话连续（取全文件最大编号 + 1）
+  - 编号跨会话连续（取全文件最大编号 + 1）；**默认 --list 只显示窗口内序号 1~N（N≤10）**，
+    全局编号仅用于存储与精确操作（--done/--clear 前用 --resolve 换算）
   - 表格行格式：| N | 标题 | 摘要 | 目标笔记 | 快照 | 状态 |
     （兼容旧 5 列格式，首次运行自动升级为 6 列；全角竖线 ｜ 会被归一化）
   - 写入统一 UTF-8 + LF，且先落临时文件再原子替换；同一时刻只应有本脚本在写
@@ -41,7 +43,7 @@ import vault_common as vc  # noqa: E402  （与本脚本同目录，共用配置
 ROW_RE = re.compile(r"^\|\s*(\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|\s*$")
 ROW_RE5 = re.compile(r"^\|\s*(\d+)\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|\s*$")
 FULLWIDTH_PIPE = "\uff5c"  # ｜
-WINDOW = 10  # 缓冲区滑动窗口兜底默认值（config.json 的 buffer_window 优先；CLI --window 最高优先）：保留最近 N 个对话的快照
+WINDOW = 10  # 缓冲区滑动窗口：保留最近 N 个对话的快照，登记后滚动清理超出项
 
 
 def buffer_path(vault):
@@ -215,10 +217,15 @@ def list_pending(lines, show_all, session_only=False, window=WINDOW):
     elif out_rows:
         label = "全部" if show_all else ("本会话段" if session_only else f"待记录(最近{window}轮)")
         print(f"待记录缓冲区（{label} {len(out_rows)} 项）：")
-        for r in out_rows:
+        for i, r in enumerate(out_rows, 1):
             status = f"（{r[5]}）" if show_all else ""
             snap = "〔快照已存〕" if r[4] and r[4] != "-" else "〔无原文〕"
-            print(f"{r[0]}. {r[1]} — {r[2]}{snap}{status}")
+            if show_all or session_only:
+                # 管理视图（--all / --session）：保留全局编号，便于精确操作
+                print(f"{r[0]}. {r[1]} — {r[2]}{snap}{status}")
+            else:
+                # 默认视图：窗口内序号固定 1~N（N≤10），避免全局大编号干扰选择
+                print(f"{i}. {r[1]} — {r[2]}{snap}")
         if not show_all:
             print("\n要记录哪些？回复“全部”/编号（如 1,3）/“都不记”/“记录刚才讲的X”")
     if unrecognized:
@@ -248,6 +255,24 @@ def filter_recent_pending(pending, window=WINDOW):
         return pending
     keep = set(sorted(r[0] for r in pending)[-window:])
     return [r for r in pending if r[0] in keep]
+
+
+def resolve_indices(lines, nums, window=WINDOW):
+    """只读：把默认列表（最近窗口 pending）中的显示序号解析为全局编号。
+
+    与 list_pending 默认视图使用同一排序（filter_recent_pending，升序），
+    供模型在用户选择序号（1~N）后取得全局编号，再以 --done / --clear 的全局编号操作。
+    """
+    rows, _ = parse_rows(lines)
+    pending = [r for r in rows if not (r[5].startswith("✅") or r[5].startswith("已记录"))]
+    windowed = filter_recent_pending(pending, window)
+    parts = []
+    for n in nums:
+        if 1 <= n <= len(windowed):
+            parts.append("%d=%d" % (n, windowed[n - 1][0]))
+        else:
+            parts.append("%d=无效(窗口内共%d项)" % (n, len(windowed)))
+    return ", ".join(parts)
 
 
 def rolling_cleanup(vault, lines, window=WINDOW):
@@ -416,7 +441,7 @@ def clear_entries(lines, vault, nums):
 def main():
     ap = argparse.ArgumentParser(description="待记录缓冲区脚本化 gate")
     ap.add_argument("--list", action="store_true", help="列出待记录项（默认）")
-    ap.add_argument("--all", action="store_true", help="列出全部项")
+    ap.add_argument("--all", action="store_true", help="列出全部项（管理视图，显示全局编号）")
     ap.add_argument("--add", metavar="标题|摘要|目标笔记",
                     help="登记新项（兼容旧写法；标题含竖线时请改用 --title/--summary/--target）")
     ap.add_argument("--title", metavar="T", help="登记新项：标题（推荐，不受竖线影响）")
@@ -427,19 +452,17 @@ def main():
     ap.add_argument("--no-snapshot", action="store_true",
                     help="极端兜底：确实无法取得本轮原文时才用，记〔无原文〕并告警（默认快照必带）")
     ap.add_argument("--session", action="store_true",
-                    help="--list 时仅列当前会话段（兼容旧行为；默认列最近 WINDOW 个 pending）")
+                    help="--list 时仅列当前会话段（管理视图，显示全局编号）")
     ap.add_argument("--window", type=int, metavar="N",
-                    help="临时覆盖滑动窗口大小（默认 config.json 的 buffer_window 或 %d）：影响列出与滚动清理" % WINDOW)
-    ap.add_argument("--done", type=int, metavar="N", help="标记编号 N 为已记录")
+                    help="覆盖默认滑动窗口大小（默认 %d）：影响列出与滚动清理" % WINDOW)
+    ap.add_argument("--resolve", metavar="N[,N...]",
+                    help="只读：把默认列表显示序号解析为全局编号（如 --resolve 1,3 → 1=131,3=133）")
+    ap.add_argument("--done", type=int, metavar="N", help="标记编号 N 为已记录（N 为全局编号）")
     ap.add_argument("--clear", metavar="N[,N...]", action="append",
-                    help="清除指定编号条目（多选：逗号分隔或重复参数）")
+                    help="清除指定编号条目（多选：逗号分隔或重复参数；N 为全局编号）")
     ap.add_argument("--vault", help="Vault 根路径（默认读 config.json）")
     args = ap.parse_args()
-    cfg = vc.load_config()
-    config_window = cfg.get("buffer_window")
-    if not (isinstance(config_window, int) and config_window > 0):
-        config_window = None
-    window = args.window if (args.window and args.window > 0) else (config_window or WINDOW)
+    window = args.window if (args.window and args.window > 0) else WINDOW
 
     vault = vc.resolve_vault_root(args.vault)
     if not vault or not os.path.isdir(vault):
@@ -478,7 +501,19 @@ def main():
         vc.warn("缓冲区有 %d 行表格无法解析（可能造成登记项不可见）：%s"
                 % (len(unrecognized), "; ".join("第 %d 行: %s" % (n, s) for n, s in unrecognized[:3])))
 
-    if args.title or args.add:
+    if args.resolve:
+        nums = []
+        for part in args.resolve.split(","):
+            part = part.strip()
+            if part.isdigit():
+                nums.append(int(part))
+            else:
+                vc.warn("忽略无效序号: %r" % part)
+        if not nums:
+            vc.warn("--resolve 需要至少一个序号，格式：--resolve 1,3")
+            sys.exit(vc.EXIT_USAGE)
+        print(resolve_indices(lines, nums, window))
+    elif args.title or args.add:
         if args.title:
             title = args.title.strip()
             summary = (args.summary or "").strip()
